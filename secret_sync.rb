@@ -11,7 +11,7 @@ class SecretSync
   attr_accessor :logger
 
   def self.rsync
-    "/usr/bin/env rsync -aruvz --delete"
+    "/usr/bin/env rsync -auvz --delete"
   end
 
   def self.skip_item?(item)
