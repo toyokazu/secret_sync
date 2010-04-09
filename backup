@@ -1,0 +1,12 @@
+#!/usr/bin/env ruby
+
+require File.expand_path('../secret_sync',  __FILE__)
+
+class SecretSyncCommand < SecretSync
+  def self.command
+    File.basename(__FILE__)
+  end
+end
+
+cmd = SecretSyncCommand.new(ARGV, {})
+cmd.run!

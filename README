@@ -1,0 +1,9 @@
+== Secret files sync tool
+You may think to share secret files among several PCs , e.g. during PC migration period. You can use this tool to sync your secret files between your machine and ENCRYPTED external storage (e.g. USB memory).
+
+backup: sync from your PC to encrypted external storage
+restore: sync from encrypted external storage to your PC
+
+Before executing this tool, you must first mount external storage.
+
+Copied files are written in config file sync.yml. You can change default behavior by editing sync.yml file.
