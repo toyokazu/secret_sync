@@ -11,7 +11,7 @@ class SecretSync
   attr_accessor :logger
 
   def self.rsync
-    "/usr/bin/env rsync"
+    "/usr/bin/env rsync -aruvz --delete"
   end
 
   def self.skip_item?(item)
@@ -86,7 +86,9 @@ class SecretSync
       if file.include?('__FIREFOX_PROFILE__')
         file.gsub!('__FIREFOX_PROFILE__', @firefox_profile_path)
       end
-      `#{self.class.rsync} -r '#{File.expand_path(file)}' '#{@config["backup_dir"]}'`
+      cmd = "#{self.class.rsync} '#{File.expand_path(file)}' '#{@config["backup_dir"]}'"
+      puts cmd
+      puts `#{cmd}`
     end
   end
 
@@ -97,14 +99,13 @@ class SecretSync
       if file.include?('__FIREFOX_PROFILE__')
         file.gsub!('__FIREFOX_PROFILE__', @firefox_profile_path)
       end
-      @basename_hash[File.basename(file)] = file
+      @basename_hash[File.basename(file)] = File.dirname(file)
     end
-#@basename_hash.each {|k,v| puts "key: #{k}, value: #{v}"}
     Dir.glob("#{@config["backup_dir"]}/.*\0#{@config["backup_dir"]}/*") do |item|
       next if self.class.skip_item?(item)
-#puts item
-      puts "#{self.class.rsync} -r '#{item}#{'/' if File.directory?(item)}' '#{File.expand_path(@basename_hash[File.basename(item)])}#{'/' if File.directory?(item)}'"
-      `#{self.class.rsync} -r '#{item}#{'/' if File.directory?(item)}' '#{File.expand_path(@basename_hash[File.basename(item)])}#{'/' if File.directory?(item)}'`
+      cmd = "#{self.class.rsync} '#{item}' '#{File.expand_path(@basename_hash[File.basename(item)])}'"
+      puts cmd
+      puts `#{cmd}`
     end
   end
 end
