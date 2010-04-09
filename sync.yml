@@ -4,7 +4,7 @@ secret_files:
 - __FIREFOX_PROFILE__/key3.db
 - __FIREFOX_PROFILE__/signons3.txt
 - __FIREFOX_PROFILE__/signons.sqlite
-backup_dir: /Volumes/ENCRYPTED/secret_backup/
+backup_dir: /Volumes/ENCRYPTED/secret_backup
 firefox_profile_prefix: ~/Library/Application Support/Firefox/Profiles
 ### if you want to specify profile name manually, add the following line.
 # firefox_profile_name: xxxyyzzz.default

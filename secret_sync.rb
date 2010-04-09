@@ -15,7 +15,7 @@ class SecretSync
   end
 
   def self.skip_item?(item)
-    (File.basename(item) != '.' && File.basename(item) != '..')
+    (File.basename(item) == '.' || File.basename(item) == '..')
   end
 
   def initialize(argv, options = {})
@@ -99,9 +99,12 @@ class SecretSync
       end
       @basename_hash[File.basename(file)] = file
     end
+#@basename_hash.each {|k,v| puts "key: #{k}, value: #{v}"}
     Dir.glob("#{@config["backup_dir"]}/.*\0#{@config["backup_dir"]}/*") do |item|
       next if self.class.skip_item?(item)
-      `#{self.class.rsync} -r '#{@config["backup_dir"]}/#{item}' '#{File.expand_path(@basename_hash[item])}'`
+#puts item
+      puts "#{self.class.rsync} -r '#{item}#{'/' if File.directory?(item)}' '#{File.expand_path(@basename_hash[File.basename(item)])}#{'/' if File.directory?(item)}'"
+      `#{self.class.rsync} -r '#{item}#{'/' if File.directory?(item)}' '#{File.expand_path(@basename_hash[File.basename(item)])}#{'/' if File.directory?(item)}'`
     end
   end
 end
