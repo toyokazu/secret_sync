@@ -103,9 +103,29 @@ class SecretSync
     end
     Dir.glob("#{@config["backup_dir"]}/.*\0#{@config["backup_dir"]}/*") do |item|
       next if self.class.skip_item?(item)
+      if @basename_hash[File.basename(item)].nil?
+        puts "Backuped file #{item} is not listed in the targets of sync.yml (skipped)."
+        next
+      end
       cmd = "#{self.class.rsync} '#{item}' '#{File.expand_path(@basename_hash[File.basename(item)])}'"
       puts cmd
       puts `#{cmd}`
+    end
+    ### FIXME (hack for TrueCrypt file system)
+    @config["secret_files"].each do |file|
+      if file.include?('__FIREFOX_PROFILE__')
+        file.gsub!('__FIREFOX_PROFILE__', @firefox_profile_path)
+      end
+      Dir.glob("#{File.expand_path(file)}\0#{File.expand_path(file)}/**") do |item|
+        next if self.class.skip_item?(item)
+        if File.directory?(item)
+          File::chmod(0700, item)
+          puts "chmod 0700 #{item}"
+        else
+          File::chmod(0600, item)
+          puts "chmod 0600 #{item}"
+        end
+      end
     end
   end
 end
