@@ -1,6 +1,7 @@
 require 'yaml'
 require 'optparse'
 require 'logger'
+require 'fileutils'
 
 class SecretSync
   OPERATIONS = %w(backup restore)
@@ -18,6 +19,10 @@ class SecretSync
     (File.basename(item) == '.' || File.basename(item) == '..')
   end
 
+  def add_home(path)
+    "#{ENV["HOME"]}/#{path}"
+  end
+
   def initialize(argv, options = {})
     @argv = argv
 
@@ -30,7 +35,7 @@ class SecretSync
     @logger.level = Logger::INFO
 
     @config = YAML.load_file(@options[:config] || 'sync.yml')
-    @firefox_profile_path = firefox_profile_path
+    @config["secret_files"] = @config["secret_files"].map {|f| add_home(f)}
   end
 
   def parser
@@ -70,52 +75,72 @@ class SecretSync
     end
   end
 
-  # return a firefox profile path found first
-  def firefox_profile_path
-    return "#{@config["firefox_profile_prefix"]}/#{@config["firefox_profile_name"]}" if @config["firefox_profile_name"]
-    # search profile dirs
-    Dir.glob("#{File.expand_path(@config["firefox_profile_prefix"])}/*") do |item|
-      return item if File.directory?(item)
+  # return firefox profiles
+  def current_firefox_profiles
+    Dir.glob("#{add_home(@config["firefox_profile_prefix"])}/*").map {|dir| File.basename(dir)}
+  end
+  
+  def backup_file(file, dir = "") 
+    cmd = "#{self.class.rsync} '#{File.expand_path(file)}' '#{@config["backup_dir"]}#{"/#{dir}/" if !dir.empty?}'"
+    puts cmd
+    puts `#{cmd}`
+  end
+
+  def restore_file(file, dir)
+    cmd = "#{self.class.rsync} '#{File.expand_path(file)}' '#{dir}'"
+    puts cmd
+    puts `#{cmd}`
+  end
+
+  def mkdir(dir)
+    if !File.exists?(dir)
+      FileUtils.mkdir_p(dir)
     end
-    logger.warn("cannot find firefox profile directory")
-    nil
   end
 
   def cmd_backup
+    @firefox_profiles = current_firefox_profiles
     @config["secret_files"].each do |file|
       if file.include?('__FIREFOX_PROFILE__')
-        file.gsub!('__FIREFOX_PROFILE__', @firefox_profile_path)
+        #file.gsub!('__FIREFOX_PROFILE__', @firefox_profile_path)
+        @firefox_profiles.each do |profile|
+          mkdir("#{add_home(@config["firefox_profile_prefix"])}/#{profile}")
+          backup_file(file.gsub('__FIREFOX_PROFILE__', "#{@config["firefox_profile_prefix"]}/#{profile}"), profile)
+        end
+      else
+        backup_file(file)
       end
-      cmd = "#{self.class.rsync} '#{File.expand_path(file)}' '#{@config["backup_dir"]}'"
-      puts cmd
-      puts `#{cmd}`
     end
+    backup_file("#{File.dirname(add_home(@config["firefox_profile_prefix"]))}/profiles.ini")
   end
 
   def cmd_restore
+    @firefox_profiles = Dir.glob("#{@config["backup_dir"]}/????????.*").find_all {|f| File.directory?(f)}.map {|f| File.basename(f)}
     ### insert secret_files into @basename_hash
     @basename_hash = {}
     @config["secret_files"].each do |file|
-      if file.include?('__FIREFOX_PROFILE__')
-        file.gsub!('__FIREFOX_PROFILE__', @firefox_profile_path)
+      if !file.include?('__FIREFOX_PROFILE__')
+        @basename_hash[File.basename(file)] = File.dirname(file)
       end
-      @basename_hash[File.basename(file)] = File.dirname(file)
     end
     Dir.glob("#{@config["backup_dir"]}/.*\0#{@config["backup_dir"]}/*") do |item|
       next if self.class.skip_item?(item)
+      if (profile = @firefox_profiles.find {|i| item.match(i)})
+        restore_file(item, "#{add_home(@config["firefox_profile_prefix"])}")
+        next
+      end
+      if File.basename(item) == "profiles.ini"
+        restore_file(item, "#{File.dirname(add_home(@config["firefox_profile_prefix"]))}")
+        next
+      end
       if @basename_hash[File.basename(item)].nil?
         puts "Backuped file #{item} is not listed in the targets of sync.yml (skipped)."
         next
       end
-      cmd = "#{self.class.rsync} '#{item}' '#{File.expand_path(@basename_hash[File.basename(item)])}'"
-      puts cmd
-      puts `#{cmd}`
+      restore_file(item, @basename_hash[File.basename(item)])
     end
     ### FIXME (hack for TrueCrypt file system)
     @config["secret_files"].each do |file|
-      if file.include?('__FIREFOX_PROFILE__')
-        file.gsub!('__FIREFOX_PROFILE__', @firefox_profile_path)
-      end
       Dir.glob("#{File.expand_path(file)}\0#{File.expand_path(file)}/**") do |item|
         next if self.class.skip_item?(item)
         if File.directory?(item)
